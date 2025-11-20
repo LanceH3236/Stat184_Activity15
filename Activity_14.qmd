@@ -1,0 +1,254 @@
+---
+title: "Stat 184 Activity 14"
+author: "Lance He"
+date: "11/12/2025"
+format: 
+  pdf:
+    toc: true 
+execute: 
+  echo: false
+  warning: false
+  message: false
+  comment: NA
+---
+
+
+## Introduction
+
+This is the 'First qmd file' for Activity 14 of Stat 184 class. 
+In the document, I will discuss the following topics:
+
+1. Armed Forces Data Wrangling Redux (Activities #08 and #10)
+
+2. Popularity of Baby Names (Activity #13)
+
+3. Plotting a Mathematical Function (Activity #04)
+
+4. What I Feel I've Learned So Far
+
+
+## Armed Forces Data Wrangling Redux
+
+In this section, I am building two tables that organize the cases by rank and branch, one table for male, one for female.
+
+From the table, some obvious conclusions that we can get are: 
+1. There are no female generals or admirals in any of the branches. 
+2. There are most people in ranks that have the paygrade from E3, E4, and E5.
+
+```{r}
+#| label: wrangling-code
+#| echo: false
+#| warning: false
+
+# Coding Style: Tidyverse
+library(tidyverse)
+
+
+file_path <- "https://docs.google.com/spreadsheets/d/19xQnI1cBh6Jkw7eP8YQuuicMlVDF7Gr-nXCb5qbwb_E/export?format=csv&gid=597536282"
+
+col_names <- c(
+  "Rank",
+  "Army_Male", "Army_Female", "Army_Total",
+  "Navy_Male", "Navy_Female", "Navy_Total",
+  "Marine_Corps_Male", "Marine_Corps_Female", "Marine_Corps_Total",
+  "Air_Force_Male", "Air_Force_Female", "Air_Force_Total",
+  "Space_Force_Male", "Space_Force_Female", "Space_Force_Total",
+  "Total_Male", "Total_Female", "Total_Total"
+)
+
+# Load the raw data from the CSV file with custom column names.
+armed_forces_raw <- read_csv(
+  file_path,
+  skip = 3,
+  col_names = col_names,
+  na = "N/A*",
+  n_max = 26
+)
+
+rank_titles <- tibble::tribble(
+  ~Rank, ~Title,
+  "E1", "E1: Private / Seaman Recruit / Private / Airman Basic / Specialist 1",
+  "E2", "E2: Private / Seaman Apprentice / Private First Class / Airman / Specialist 2",
+  "E3", "E3: Private First Class / Seaman / Lance Corporal / Airman First Class / Specialist 3",
+  "E4", "E4: Corporal OR Specialist / Petty Officer Third Class / Corporal / Senior Airman / Specialist 4",
+  "E5", "E5: Sergeant / Petty Officer Second Class / Sergeant / Staff Sergeant / Sergeant",
+  "E6", "E6: Staff Sergeant / Petty Officer First Class / Staff Sergeant / Technical Sergeant / Technical Sergeant",
+  "E7", "E7: Sergeant First Class / Chief Petty Officer / Gunnery Sergeant / Master Sergeant OR First Sergeant / Master Sergeant",
+  "E8", "E8: First Sergeant OR Master Sergeant / Senior Chief Petty Officer / First Sergeant OR Master Sergeant / Senior Master Sergeant OR First Sergeant / Senior Master Sergeant",
+  "E9", "E9: Sergeant Major OR Command Sergeant Major / Master Chief Petty Officer OR Fleet/Command Master Chief Petty Officer / Sergeant Major OR Master Gunnery Sergeant / Chief Master Sergeant OR First Sergeant / Chief Master Sergeant",
+  "W1", "W1: Warrant Officer / Warrant Officer / Warrant Officer / Warrant Officer",
+  "W2", "W2: Chief Warrant Officer / Chief Warrant Officer / Chief Warrant Officer / Chief Warrant Officer",
+  "W3", "W3: Chief Warrant Officer / Chief Warrant Officer / Chief Warrant Officer / Chief Warrant Officer",
+  "W4", "W4: Chief Warrant Officer / Chief Warrant Officer / Chief Warrant Officer / Chief Warrant Officer",
+  "W5", "W5: Chief Warrant Officer / Chief Warrant Officer / Chief Warrant Officer / Chief Warrant Officer",
+  "O1", "O1: Second Lieutenant / Ensign / Second Lieutenant / Second Lieutenant / Second Lieutenant",
+  "O2", "O2: First Lieutenant / Lieutenant Junior Grade / First Lieutenant / First Lieutenant / First Lieutenant",
+  "O3", "O3: Captain / Lieutenant / Captain / Captain / Captain",
+  "O4", "O4: Major / Lieutenant Commander / Major / Major / Major",
+  "O5", "O5: Lieutenant Colonel / Commander / Lieutenant Colonel / Lieutenant Colonel / Lieutenant Colonel",
+  "O6", "O6: Colonel / Captain / Colonel / Colonel / Colonel",
+  "O7", "O7: Brigadier General / Rear Admiral (Lower) / Brigadier General / Brigadier General / Brigadier General",
+  "O8", "O8: Major General / Rear Admiral (Upper) / Major General / Major General / Major General",
+  "O9", "O9: Lieutenant General / Vice Admiral / Lieutenant General / Lieutenant General / Lieutenant General",
+  "O10", "O10: General / Admiral / General / General / General",
+)
+
+# Clean and reshape the data into a tidy, long format.
+armed_forces_tidy <- armed_forces_raw %>%
+  left_join(rank_titles, by = "Rank") %>%
+  filter(!is.na(Title)) %>%
+  # The description of the rank makes the table messy, so we only keeps the 'Rank' column
+  # This keeps the original 'Rank' column (E1, E2, etc.).
+  select(-Title) %>%
+  relocate(Rank) %>%
+  select(-ends_with("_Total")) %>%
+  pivot_longer(
+    cols = -Rank,
+    names_to = "Branch_Sex",
+    values_to = "Count"
+  ) %>%
+  extract(Branch_Sex, into = c("Branch", "Sex"), regex = "(.*)_(Male|Female)$") %>%
+  mutate(
+    Count = as.numeric(gsub(",", "", Count)),
+    Count = replace_na(Count, 0)
+  )
+
+
+enlisted_tidy_data <- armed_forces_tidy %>%
+  filter(str_starts(Rank, "E"))
+
+
+# Create a final frequency table for male ENLISTED personnel.
+male_frequency_table <- enlisted_tidy_data %>%
+  filter(Sex == "Male") %>%
+  select(-Sex) %>%
+  pivot_wider(
+    names_from = Branch,
+    values_from = Count
+  )
+
+# Create a final frequency table for female ENLISTED personnel.
+female_frequency_table <- enlisted_tidy_data %>%
+  filter(Sex == "Female") %>%
+  select(-Sex) %>%
+  pivot_wider(
+    names_from = Branch,
+    values_from = Count
+  )
+
+# Print the tables using knitr::kable() so they appear in the PDF.
+knitr::kable(male_frequency_table, caption = "Frequency of Male ENLISTED Personnel (E1-E9) by Rank and Branch")
+knitr::kable(female_frequency_table, caption = "Frequency of Female ENLISTED Personnel (E1-E9) by Rank and Branch")
+```
+## Popularity of Baby Names
+
+
+Summary and Observations:
+
+This line chart tracks the popularity of four different names (two male, two female) from 1880 to the present. The x-axis shows the year, the y-axis shows the total number of births, and each name gets its own colored line. It's really interesting to see how "James" and "Michael" peaked in the mid-1900s, while "Jennifer" and "Jessica" had their massive spike in popularity much later, around the 1980s.
+
+
+```{r}
+#| label: baby-names-plot
+#| echo: false
+#| warning: false
+#| fig-cap: "Popularity of Classic Names"
+#| fig-alt: "The image is a line graph titled 'Popularity of Classic Names Over Time' depicting the popularity of four names: James, Jennifer, Jessica, and Michael over time, from 1875 to 2020. The x-axis represents the years, incrementing from 1875 to 2020, and the y-axis represents the total number of births, ranging from 0 to 100,000. The data is plotted with four lines: a red line for James, a green line for Jennifer, a blue line for Jessica, and a purple line for Michael. The graph shows that the name James had higher popularity before experiencing a gradual decline post-1980. Jennifer's popularity sharply peaked around 1975 before declining similarly. Jessica rose sharply around 1980 and started declining after 2000. Michael shows continuous growth, peaking around 1990 before also declining. A legend at the right clarifies the colors associated with each name."
+
+library(dcData)
+library(dplyr)
+library(ggplot2)
+
+# 1. Filter the data and create the 3-attribute plot
+BabyNames %>%
+  
+  filter(
+    (name == "Jennifer" & sex == "F") |
+      (name == "Jessica" & sex == "F")  |
+      (name == "Michael" & sex == "M")   |
+      (name == "James" & sex == "M")
+  ) %>%
+  
+  # 2. Create the plot
+  ggplot(mapping = aes(x = year, y = count, color = name)) +
+  
+  # 3. Add the line geometry
+  geom_line(linewidth = 1.2) + 
+  
+  # 4. Add a professional theme and polished labels
+  theme_minimal() +
+  labs(
+    title = "Popularity of Classic Names Over Time",
+    subtitle = "Tracking 'Jennifer', 'Jessica', 'Michael', and 'James'",
+    x = "Year",
+    y = "Total Number of Births",
+    color = "Name"
+  )
+```
+## Plotting a Mathematical Function
+
+
+Summary and Observations:
+
+1. The estimated rounded maximum volume of the box (to one decimal place) is 66.15 cubic inches.
+2. The side length of the square that results in this volume (to two decimal places) is 1.59 inches.
+
+
+```{r}
+#| label: box-plot
+#| echo: false
+#| warning: false
+#| fig-cap: "Plotting a Mathematical Function"
+#| fig-alt: "The image is a line graph showing how the volume of a box changes with different side lengths of a square cutout. The horizontal axis is labeled 'Side Length of Square Cutout (inches)' ranging from 0 to 4. The vertical axis is labeled 'Volume of Box (cubic inches)' ranging from 0 to 60. The graph displays an upward curve starting from the origin, peaking just before 2 inches, and then descending gradually back toward the base of the graph up to 4 inches. The peak of the curve indicates the maximum box volume around 60 cubic inches."
+
+find_volume <- function(cut_length){
+  length = 8.5
+  width = 11
+  box_length = length - 2 * cut_length
+  box_width = width - 2 * cut_length
+  height = cut_length
+  
+  Volume <- box_length*box_width*height
+  
+
+  ifelse(cut_length >= 0 & cut_length <= 8.5 / 2, Volume, NA)
+}
+
+# 2. Create the ggplot using stat_function as required by the assignment
+#    The domain is from 0 to the maximum possible cut (4.25)
+ggplot(data.frame(x = c(0, 4.25)), aes(x = x)) +
+  stat_function(fun = find_volume, n = 200) + # n=200 makes a smoother curve
+  labs(
+    title = "Box Volume with cut length increase",
+    x = "Side Length of Square Cutout (inches)",
+    y = "Volume of Box (cubic inches)"
+  ) +
+  theme_minimal()
+```
+## What You Feel You've Learned So Far
+
+I learned how to use the quarto files and use the pdf format of it. Also, using descriptive language to give the readers contexts about the plots and tables. Last but not least, I improved some of my older code and makes it being able to run on other computers without alternations. 
+---
+
+\newpage 
+
+## Code Appendix
+
+
+### Armed Forces Data Wrangling (Activities #08 & #10)
+
+```{r ref-wrangling-code, ref.label='wrangling-code', eval=FALSE, echo=TRUE}
+
+```
+
+### Popularity of Baby Names (Activity #13)
+
+```{r ref-baby-names-plot, ref.label='baby-names-plot', eval=FALSE, echo=TRUE}
+
+```
+
+### Plotting a Mathematical Function (Activity #04)
+
+```{r ref-box-plot, ref.label='box-plot', eval=FALSE, echo=TRUE}
+
+```
